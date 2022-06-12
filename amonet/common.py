@@ -5,7 +5,7 @@ import time
 
 import serial
 
-from logger import log
+from amonet.logger import log
 
 BAUD = 115200
 TIMEOUT = 5

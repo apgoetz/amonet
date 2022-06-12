@@ -1,7 +1,7 @@
 import sys
 
-from common import Device
-from logger import log
+from amonet.common import Device
+from amonet.logger import log
 
 
 def handshake(dev):

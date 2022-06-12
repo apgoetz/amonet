@@ -1,17 +1,38 @@
 import struct
 
-from common import Device
-from handshake import handshake
-from load_payload import load_payload
-from logger import log
+from amonet.common import Device
+from amonet.handshake import handshake
+from amonet.load_payload import load_payload
+from amonet.logger import log
 
 def switch_boot0(dev):
     dev.emmc_switch(1)
     block = dev.emmc_read(0)
-    if block[0:9] != b"EMMC_BOOT":
+    if block[0:9] != b"EMMC_BOOT" and block[0:9] != b"BADD_BOOT":
         dev.reboot()
         raise RuntimeError("what's wrong with your BOOT0?")
 
+
+def read_boot0(dev):
+    switch_boot0(dev)
+    i = 0
+    with open('boot0.bin', 'wb') as fout:
+        while True:
+            data = dev.emmc_read(i)
+            fout.write(data)
+            i = i + 1
+    
+#  read data. note: number of bytes is increased to nearest blocksize
+def dump_binary(dev, outfile, start_block, nblocks=0):
+    
+    with open(outfile, "wb") as fout:
+        while nblocks > 0:
+            data = dev.emmc_read(start_block)
+            fout.write(data)
+            start_block = start_block + 1
+            nblocks = nblocks - 1
+
+    
 def flash_binary(dev, path, start_block, max_size=0):
     with open(path, "rb") as fin:
         data = fin.read()
@@ -47,14 +68,23 @@ def parse_gpt(dev):
     return parts
 
 def main():
-    dev = Device()
-    dev.find_device()
 
-    # 0.1) Handshake
-    handshake(dev)
+
+    while True:
+        try:
+            dev = Device()
+            dev.find_device()
+
+            # 0.1) Handshake
+            handshake(dev)
+        except RuntimeError:
+            log("wrong handshake response, probably in preloader")
+            continue
+        log("handshake success!")
+        break
 
     # 0.2) Load brom payload
-    load_payload(dev, "../brom-payload/build/payload.bin")
+    load_payload(dev, "brom-payload/build/payload.bin")
 
     # 1) Sanity check GPT
     log("Check GPT")
@@ -66,6 +96,8 @@ def main():
     if "lk" not in gpt or "tee1" not in gpt or "boot" not in gpt or "recovery" not in gpt:
         raise RuntimeError("bad gpt")
 
+    raise Exception("stop here, before writing")
+    
     # 2) Sanity check boot0
     log("Check boot0")
     switch_boot0(dev)
@@ -77,6 +109,8 @@ def main():
         log("rpmb looks broken; if this is expected (i.e. you're retrying the exploit) press enter, otherwise terminate with Ctrl+C")
         input()
 
+
+        
     # 4) Zero out rpmb to enable downgrade
     log("Downgrade rpmb")
     dev.rpmb_write(b"\x00" * 0x100)
@@ -90,27 +124,27 @@ def main():
     # 5) Install lk-payload
     log("Flash lk-payload")
     switch_boot0(dev)
-    flash_binary(dev, "../lk-payload/build/payload.bin", 0x200000 // 0x200)
+    flash_binary(dev, "lk-payload/build/payload.bin", 0x200000 // 0x200)
 
     # 6) Downgrade preloader
     log("Flash preloader")
     switch_boot0(dev)
-    flash_binary(dev, "../bin/boot0-short.bin", 0)
+    flash_binary(dev, "bin/boot0-short.bin", 0)
 
     # 7) Downgrade tz
     log("Flash tz")
     switch_user(dev)
-    flash_binary(dev, "../bin/tz.bin", gpt["tee1"][0], gpt["tee1"][1] * 0x200)
+    flash_binary(dev, "bin/tz.bin", gpt["tee1"][0], gpt["tee1"][1] * 0x200)
 
     # 8) Downgrade lk
     log("Flash lk")
     switch_user(dev)
-    flash_binary(dev, "../bin/lk.bin", gpt["lk"][0], gpt["lk"][1] * 0x200)
+    flash_binary(dev, "bin/lk.bin", gpt["lk"][0], gpt["lk"][1] * 0x200)
 
     # 9) Flash microloader
     log("Inject microloader")
     switch_user(dev)
-    flash_binary(dev, "../bin/microloader.bin", gpt["boot"][0], gpt["boot"][1] * 0x200)
+    flash_binary(dev, "bin/microloader.bin", gpt["boot"][0], gpt["boot"][1] * 0x200)
 
     # Reboot (to fastboot)
     log("Reboot to unlocked fastboot")

@@ -1,8 +1,8 @@
 import struct
 
-from common import CRYPTO_BASE
+from amonet.common import CRYPTO_BASE
 
-from logger import log
+from amonet.logger import log
 
 
 def init(dev):
