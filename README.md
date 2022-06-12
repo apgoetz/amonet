@@ -1,8 +1,10 @@
-# amonet
+# amonet-biscuit
 
-This is an exploit chain for Fire HD 8 (2018) (8th gen / karnak / KFKAWI). It contains a MediaTek bootrom exploit and a LittleKernel bootloader exploit.
+This is a fork of the original amonont exploit chain, documented [here](https://github.com/xyzz/amonet). 
 
-For installation instructions, see https://forum.xda-developers.com/hd8-hd10/orig-development/fire-hd-8-2018-downgrade-unlock-root-t3894256
+This fork was created to document how to root the Echo Dot v2
+(biscuit). It also has been re-organized to allow the BROM exploit to
+be used as a mini-shell for read/write of eMMC and memory. 
 
 ## License
 
